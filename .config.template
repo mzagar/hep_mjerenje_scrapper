@@ -1,0 +1,7 @@
+HEP_USERNAME='<username>'
+HEP_PASSWORD='<password>'
+HEP_OIB='<OIB>'
+HEP_OMM='<omm>'
+
+# month from which to start getting HEP data
+START_MONTH='03.2023'
