@@ -2,6 +2,8 @@
 
 ### env vars required: HEP_USERNAME, HEP_PASSWORD, HEP_OIB, HEP_OMM (optinally HEP_TOKEN instead username/pass)
 
+source .config
+
 
 if [[ "$HEP_TOKEN" == "" && ("$HEP_USERNAME" == "" || "$HEP_PASSWORD" == "") ]]
 then
@@ -9,8 +11,6 @@ then
 	exit 1
 fi
 
-
-. .config
 
 CURR_MONTH="$(date +%m.%Y)"
 MONTH=${1:-"$CURR_MONTH"}
@@ -25,8 +25,8 @@ HEP_R_FILE="hep_${MONTH}_r.csv"
 if [ "$MONTH" == "$CURR_MONTH" ]
 then
 	[ "$HEP_DEBUG" != "" ] && echo "Backing up current month files..."
-	mv $HEP_P_FILE "${HEP_P_FILE}.old"
-	mv $HEP_R_FILE "${HEP_R_FILE}.old"
+	rm -f $HEP_P_FILE
+	rm -f $HEP_R_FILE
 fi
 
 if [[ ! -f $HEP_P_FILE || ! -f $HEP_R_FILE ]]
