@@ -45,7 +45,7 @@ Crating hep.db database...
 Importing all 'P' csv data into 'p' table...
 Importing all 'R' csv data into 'r' table...
 
-Usage by month:
+Usage by month since 2023-03-14:
 mjesec               P_kwh             R_kwh             razlika_kwh
 -------------------  ----------------  ----------------  -----------------
 2023-03-01 00:00:00  187.505           285.643999999999  -98.1389999999995
@@ -53,7 +53,7 @@ mjesec               P_kwh             R_kwh             razlika_kwh
 2023-05-01 00:00:00  195.51            145.629           49.8810000000002
 2023-06-01 00:00:00  0                 0                 0
 
-Usage by year:
+Usage by year since 2023-03-14:
 godina               sum(P_kwh)        sum(R_kwh)        sum(razlika_kwh)
 -------------------  ----------------  ----------------  ----------------
 2023-01-01 00:00:00  768.051999999998  759.360999999999  8.69099999999867

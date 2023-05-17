@@ -16,9 +16,9 @@ cat *_r.csv | grep -v Mjerno | awk 'BEGIN {FS=OFS="\t"} {split($2, dateParts, ".
 source .config
 
 echo
-echo "Usage by month:"
+echo "Usage by month since ${START_DAY}:"
 sqlite3 -column -header hep.db "with x as (select datetime(p.datum, 'start of month') as mjesec, sum(p.energija) as P_kwh, sum(r.energija) as R_kwh from p join r on p.datum=r.datum and p.vrijeme = r.vrijeme where p.datum >= '${START_DAY}' group by 1 order by 1 asc) select *, (P_kwh-R_kwh) as razlika_kwh from x;"
 
 echo
-echo "Usage by year:"
+echo "Usage by year since ${START_DAY}:"
 sqlite3 -column -header hep.db "with data as (with x as (select datetime(p.datum, 'start of month') as mjesec, sum(p.energija) as P_kwh, sum(r.energija) as R_kwh from p join r on p.datum=r.datum and p.vrijeme = r.vrijeme where p.datum >= '${START_DAY}' group by 1 order by 1 asc) select *, (P_kwh-R_kwh) as razlika_kwh from x) select datetime(mjesec, 'start of year') as godina, sum(P_kwh), sum(R_kwh), sum(razlika_kwh) from data group by 1 order by 1 asc;"
