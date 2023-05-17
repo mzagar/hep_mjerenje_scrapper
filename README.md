@@ -41,3 +41,22 @@ month    from_grid(kWh) to_grid(kWh)   diff(kWh)
 05.2023: 195.46100000 / 145.62900000 / 49.83200000
 Total : 767.97 / 759.36 / 8.61
 ```
+## Importing data into sqlite
+
+Run `bash db-import.sh` to create hep.db sqlite database and import all CSV data int 'p' and 'r' tables.
+
+Example run:
+```
+% bash ./db-import.sh
+Crating hep.db database...
+Importing all 'P' csv data into 'p' table...
+Importing all 'R' csv data into 'r' table...
+
+Usage by month:
+mjesec               sum(p.energija)   sum(r.energija)
+-------------------  ----------------  ----------------
+2023-03-01 00:00:00  187.505           285.643999999999
+2023-04-01 00:00:00  385.036999999998  328.088
+2023-05-01 00:00:00  195.51            145.629
+2023-06-01 00:00:00  0                 0
+```
