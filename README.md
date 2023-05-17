@@ -5,9 +5,9 @@ Scrapes consumed/produced electricity data from HEP mjerenje site: https://mjere
 
 ## How to use
 
-Define login parameters and from which month to start scraping data in .config file.
+1. create `.config` file with login parameters and start month/day to start scraping data
 
-Run `bash ./run.sh` to run scrape.
+2. run `bash ./run.sh` to run scrape which will generate CSV data files and populate sqlite database
 
 
 ## Configuration
