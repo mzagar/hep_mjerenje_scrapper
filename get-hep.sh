@@ -1,6 +1,7 @@
 #!/bin/bash
 
 ### env vars required: HEP_USERNAME, HEP_PASSWORD, HEP_OIB, HEP_OMM (optinally HEP_TOKEN instead username/pass)
+### optionally set HEP_OFFLINE to prevent getting current month data from HEP site  
 
 source .config
 
@@ -22,7 +23,7 @@ HEP_R_FILE="hep_${MONTH}_r.csv"
 [ "$HEP_DEBUG" != "" ] && echo "Input params: HEP_USERNAME=${HEP_USERNAME}, HEP_PASSWORD=${HEP_PASSWORD}, HEP_TOKEN=${HEP_TOKEN}, HEP_OIB=${HEP_OIB}, HEP_OMM=${HEP_OMM}, CURR_MONTH=${CURR_MONTH}, MONTH=${MONTH}, DAY=${DAY}, HEP_P_FILE=${HEP_P_FILE}, HEP_R_FILE=${HEP_R_FILE}"
 
 # refresh current month file always
-if [ "$MONTH" == "$CURR_MONTH" ]
+if [[ "$MONTH" == "$CURR_MONTH" &&  "$HEP_OFFLINE" == "" ]]
 then
 	[ "$HEP_DEBUG" != "" ] && echo "Backing up current month files..."
 	rm -f $HEP_P_FILE
