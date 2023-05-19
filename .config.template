@@ -3,6 +3,9 @@ HEP_PASSWORD='<password>'
 HEP_OIB='<OIB>'
 HEP_OMM='<omm>'
 
+## uncomment to prevent scraping current month data from HEP site and just use local files
+# HEP_OFFLINE=1
+
 # month from which to start getting HEP data
 START_MONTH='03.2023'
 
