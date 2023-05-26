@@ -19,7 +19,7 @@ Additionally, you can test without username/password with only `HEP_TOKEN` defin
 
 ## How it works
 
-When `run.sh` script runs it will, for each month starting with START_MONTH (month sequence is generated using script `month_sequence.sh`), execute `get-hep.sh` script which produces CSV data files. After getting latest data from HEP script will also import everything into sqlite hep.db database. 
+When `run.sh` script runs it will, for each month starting with START_MONTH (month sequence is generated using script `month_sequence.sh`), execute `get-hep-data.sh` script which produces CSV data files. After getting latest data from HEP script will also import everything into sqlite hep.db database. 
 
 If CSV file already exists, it will not be scraped again (only current month is scrapped everytime when script runs).
 
