@@ -1,7 +1,7 @@
 HEP_USERNAME='<username>'
 HEP_PASSWORD='<password>'
 HEP_OIB='<OIB>'
-HEP_OMM='<omm>'
+HEP_OMM='ALL'
 
 ## uncomment to prevent scraping current month data from HEP site and just use local files
 # HEP_OFFLINE=1

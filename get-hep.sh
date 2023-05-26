@@ -58,8 +58,8 @@ then
 	fi
 fi
 
-[ "$HEP_DEBUG" != "" ] && echo "Calculating from/to grid numbers..."
+# [ "$HEP_DEBUG" != "" ] && echo "Calculating from/to grid numbers..."
 
-FROM_GRID=$(cat $HEP_P_FILE | grep $DAY | awk '{print $9}' | sed 's/,/./g' | paste -sd+ - | bc)
-TO_GRID=$(cat $HEP_R_FILE | grep $DAY | awk '{print $9}' | sed 's/,/./g' | paste -sd+ - | bc)
-echo "$DAY: $FROM_GRID / $TO_GRID / $(echo "$FROM_GRID-$TO_GRID" | bc)"
+# FROM_GRID=$(cat $HEP_P_FILE | grep $DAY | awk '{print $9}' | sed 's/,/./g' | paste -sd+ - | bc)
+# TO_GRID=$(cat $HEP_R_FILE | grep $DAY | awk '{print $9}' | sed 's/,/./g' | paste -sd+ - | bc)
+# echo "$DAY: $FROM_GRID / $TO_GRID / $(echo "$FROM_GRID-$TO_GRID" | bc)"
