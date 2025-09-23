@@ -2,9 +2,11 @@
 
 source .config
 
+DB_PATH="data/database/hep.db"
+
 N_LAST_DAYS=30
 echo "Usage in last $N_LAST_DAYS days:"
-sqlite3 -column -header hep.db "\
+sqlite3 -column -header "$DB_PATH" "\
   with data as (
     with x as (
       select datetime(p.datum, 'start of day') as dan, sum(p.energija) as P_kwh, sum(r.energija) as R_kwh 
@@ -17,7 +19,7 @@ sqlite3 -column -header hep.db "\
 
 echo
 echo "Usage by month since ${START_DAY}:"
-sqlite3 -column -header hep.db "\
+sqlite3 -column -header "$DB_PATH" "\
   with x as (
     select datetime(p.datum, 'start of month') as mjesec, sum(p.energija) as P_kwh, sum(r.energija) as R_kwh 
     from p join r on p.datum=r.datum and p.vrijeme = r.vrijeme 
@@ -28,7 +30,7 @@ sqlite3 -column -header hep.db "\
 
 echo
 echo "Usage by year since ${START_DAY}:"
-sqlite3 -column -header hep.db "\
+sqlite3 -column -header "$DB_PATH" "\
   with data as (
     with x as (
       select datetime(p.datum, 'start of month') as mjesec, sum(p.energija) as P_kwh, sum(r.energija) as R_kwh 

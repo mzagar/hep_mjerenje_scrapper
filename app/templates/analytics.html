@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HEP Energy Analytics Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/index.umd.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .dashboard-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .metric-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+            transition: transform 0.2s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .metric-label {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .metric-change {
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .metric-change.positive { color: #27ae60; }
+        .metric-change.negative { color: #e74c3c; }
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .chart-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 0.5rem;
+        }
+        .controls-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            color: #7f8c8d;
+        }
+        .nav-tabs .nav-link {
+            color: #6c757d;
+            border: none;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-tabs .nav-link.active {
+            color: #3498db;
+            background: none;
+            border-bottom: 2px solid #3498db;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-good { background-color: #27ae60; }
+        .status-warning { background-color: #f39c12; }
+        .status-error { background-color: #e74c3c; }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .info-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .info-button:hover {
+            background: #2980b9;
+            color: white;
+        }
+        .chart-info {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            display: none;
+        }
+        .chart-info.show {
+            display: block;
+        }
+        /* Ensure Plotly charts are properly contained */
+        [id$="Chart"] {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Fix container alignment issues */
+        .container-fluid {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Ensure tab content doesn't overflow */
+        .tab-content {
+            overflow-x: hidden;
+        }
+
+        /* Fix row margins */
+        .row {
+            margin-left: 0;
+            margin-right: 0;
+        }
+
+        /* Center pie/donut charts specifically */
+        #timeOfUseChart {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="fas fa-bolt"></i> HEP Energy Analytics</h1>
+                    <p class="mb-0">Comprehensive electricity consumption and production analysis</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div id="currentPeriod" class="mb-1 small"><strong>Current Period:</strong> <span id="periodDisplay">Last 30 days</span></div>
+                    <div id="lastUpdate" class="small opacity-75"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid px-3">
+        <!-- Controls Panel -->
+        <div class="controls-panel">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <label class="form-label">Date Range</label>
+                    <select id="dateRange" class="form-select">
+                        <option value="7">Last 7 days</option>
+                        <option value="30" selected>Last 30 days</option>
+                        <option value="90">Last 3 months</option>
+                        <option value="this_week">This week</option>
+                        <option value="last_week">Last week</option>
+                        <option value="this_month">This month</option>
+                        <option value="last_month">Last month</option>
+                        <option value="this_quarter">This quarter</option>
+                        <option value="last_quarter">Last quarter</option>
+                        <option value="this_year_to_date">This year to date</option>
+                        <option value="this_year">This year (full)</option>
+                        <option value="last_year">Last year</option>
+                        <option value="365">Last 365 days</option>
+                        <option value="all_time">All time</option>
+                        <option value="custom">Custom range</option>
+                    </select>
+                </div>
+                <div class="col-md-4" id="customDateRange" style="display: none;">
+                    <div class="row">
+                        <div class="col">
+                            <label class="form-label">From</label>
+                            <input type="date" id="startDate" class="form-control">
+                        </div>
+                        <div class="col">
+                            <label class="form-label">To</label>
+                            <input type="date" id="endDate" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button id="refreshData" class="form-control btn btn-primary">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div class="col-md-3 text-end">
+                    <div class="btn-group">
+                        <button id="exportPDF" class="btn btn-outline-secondary">
+                            <i class="fas fa-file-pdf"></i> Export PDF
+                        </button>
+                        <button id="exportCSV" class="btn btn-outline-secondary">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Metrics Overview -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="chart-header">
+                    <h4>Key Performance Metrics</h4>
+                    <button class="info-button" onclick="toggleChartInfo('metricsInfo')" title="What do these metrics mean?">
+                        <i class="fas fa-info"></i>
+                    </button>
+                </div>
+                <div id="metricsInfo" class="chart-info">
+                    <strong>Key Metrics Explained:</strong> <br>
+                    • <strong>Total Consumed:</strong> All electricity you've used from both solar and grid<br>
+                    • <strong>Total Produced:</strong> All electricity your solar panels have generated<br>
+                    • <strong>Net Energy:</strong> Negative = you produced more than used (good!), Positive = you used more than produced<br>
+                    • <strong>Self-Consumption:</strong> Percentage of your electricity that came from your own solar panels (higher is better)
+                </div>
+            </div>
+        </div>
+        <div class="row" id="metricsRow">
+            <!-- Metrics will be populated by JavaScript -->
+        </div>
+
+        <!-- Main Dashboard Tabs -->
+        <div class="chart-container">
+            <ul class="nav nav-tabs" id="dashboardTabs">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#overview-tab">
+                        <i class="fas fa-chart-line"></i> Overview
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#patterns-tab">
+                        <i class="fas fa-chart-bar"></i> Usage Patterns
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#efficiency-tab">
+                        <i class="fas fa-leaf"></i> Efficiency
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#financial-tab">
+                        <i class="fas fa-euro-sign"></i> Financial
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#comparison-tab">
+                        <i class="fas fa-balance-scale"></i> Compare
+                    </a>
+                </li>
+            </ul>
+
+            <div class="tab-content mt-3">
+                <!-- Overview Tab -->
+                <div class="tab-pane fade show active" id="overview-tab">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="chart-header">
+                                <h5>Daily Energy Flow</h5>
+                                <button class="info-button" onclick="toggleChartInfo('overviewInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="overviewInfo" class="chart-info">
+                                <strong>Daily Energy Flow Chart:</strong> This chart shows your daily electricity consumption (red line) and solar production (green line) over time. The blue dashed line shows your net energy balance - when it's below zero, you produced more than you consumed that day (good!). When it's above zero, you consumed more than you produced.
+                            </div>
+                            <div id="overviewChart" style="height: 400px;"></div>
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="chart-header">
+                                <h5>Monthly Trends</h5>
+                                <button class="info-button" onclick="toggleChartInfo('monthlyInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="monthlyInfo" class="chart-info">
+                                <strong>Monthly Trends:</strong> This bar chart compares your total monthly electricity consumption (red bars) vs solar production (green bars). Taller green bars mean better solar production months. Compare the heights to see seasonal patterns - typically summer months have higher solar production.
+                            </div>
+                            <div id="monthlyChart" style="height: 300px;"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="chart-header">
+                                <h5>Net Energy Balance</h5>
+                                <button class="info-button" onclick="toggleChartInfo('netEnergyInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="netEnergyInfo" class="chart-info">
+                                <strong>Net Energy Balance:</strong> Green bars (negative values) mean you were a net producer that month - you generated more electricity than you used! Red bars (positive values) mean you consumed more than you produced. The goal is to have as many green bars as possible.
+                            </div>
+                            <div id="netEnergyChart" style="height: 300px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usage Patterns Tab -->
+                <div class="tab-pane fade" id="patterns-tab">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="chart-header">
+                                <h5>Hourly Average Pattern</h5>
+                                <button class="info-button" onclick="toggleChartInfo('hourlyPatternInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="hourlyPatternInfo" class="chart-info">
+                                <strong>Hourly Pattern:</strong> Shows your average electricity consumption for each hour of the day. Peak hours (usually evening) will show higher bars. This helps you understand when you use most electricity - useful for optimizing usage during cheaper off-peak hours.
+                            </div>
+                            <div id="hourlyPatternChart" style="height: 300px;"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="chart-header">
+                                <h5>Daily Average Pattern</h5>
+                                <button class="info-button" onclick="toggleChartInfo('dailyPatternInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="dailyPatternInfo" class="chart-info">
+                                <strong>Daily Pattern:</strong> Compares your average consumption across different days of the week. You might notice weekends have different usage patterns than weekdays due to being home more or different activities.
+                            </div>
+                            <div id="dailyPatternChart" style="height: 300px;"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="chart-header">
+                                <h5>Monthly Average Pattern</h5>
+                                <button class="info-button" onclick="toggleChartInfo('monthlyPatternInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="monthlyPatternInfo" class="chart-info">
+                                <strong>Monthly Pattern:</strong> Shows seasonal consumption patterns. Winter months typically show higher consumption (heating), while summer might be lower. This helps predict future consumption and identify seasonal trends.
+                            </div>
+                            <div id="monthlyPatternChart" style="height: 300px;"></div>
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="chart-header">
+                                <h5>Time-of-Use Analysis</h5>
+                                <button class="info-button" onclick="toggleChartInfo('timeOfUseInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="timeOfUseInfo" class="chart-info">
+                                <strong>Time-of-Use Analysis:</strong> This pie chart breaks down your consumption by time periods. "Peak" hours (7 AM - 9 PM) usually cost more than "Off-Peak" hours. The goal is to shift usage to off-peak periods when possible to save money on your electricity bill.
+                            </div>
+                            <div id="timeOfUseChart" style="height: 400px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Efficiency Tab -->
+                <div class="tab-pane fade" id="efficiency-tab">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="chart-header">
+                                <h5>Energy Independence Trend</h5>
+                                <button class="info-button" onclick="toggleChartInfo('independenceInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="independenceInfo" class="chart-info">
+                                <strong>Energy Independence:</strong> Shows what percentage of your daily electricity needs were met by your solar panels. 100% means you were completely self-sufficient that day. Higher percentages are better - it means you relied less on the electrical grid.
+                            </div>
+                            <div id="independenceChart" style="height: 300px;"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="chart-header">
+                                <h5>Grid Export Percentage</h5>
+                                <button class="info-button" onclick="toggleChartInfo('exportInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="exportInfo" class="chart-info">
+                                <strong>Grid Export:</strong> Shows what percentage of your solar production was exported back to the electrical grid (not used immediately). Lower percentages are generally better - it means you're using more of your own solar energy directly, which saves more money than selling it back.
+                            </div>
+                            <div id="selfConsumptionChart" style="height: 300px;"></div>
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="chart-header">
+                                <h5>Efficiency Metrics Summary</h5>
+                                <button class="info-button" onclick="toggleChartInfo('efficiencyInfo')" title="What do these metrics mean?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="efficiencyInfo" class="chart-info">
+                                <strong>Efficiency Metrics:</strong> These cards show your solar system's performance. "Avg Energy Independence" is how much of your electricity comes from solar. "Self-Sufficient Days" counts days when you produced more than you used. Higher numbers indicate better solar system performance and more savings.
+                            </div>
+                            <div id="efficiencyMetrics"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Financial Tab -->
+                <div class="tab-pane fade" id="financial-tab">
+                    <!-- Financial Configuration Panel -->
+                    <div class="controls-panel mb-4">
+                        <div class="row align-items-center mb-3">
+                            <div class="col-12">
+                                <h6><i class="fas fa-cog"></i> HEP Tariff Configuration</h6>
+                                <small class="text-muted">Adjust settings to match your HEP electricity contract</small>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label class="form-label">Tariff Type</label>
+                                <select id="tariffType" class="form-select">
+                                    <option value="single">Single Tariff (jednokratna)</option>
+                                    <option value="dual">Dual Tariff (dvotarifna)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2" id="singleTariffGroup">
+                                <label class="form-label">Price (€/kWh)</label>
+                                <input type="number" id="singlePrice" class="form-control" value="0.11" step="0.001" min="0">
+                            </div>
+                            <div class="col-md-4" id="dualTariffGroup" style="display: none;">
+                                <div class="row">
+                                    <div class="col">
+                                        <label class="form-label">Peak (€/kWh)</label>
+                                        <input type="number" id="peakPrice" class="form-control" value="0.13" step="0.001" min="0">
+                                    </div>
+                                    <div class="col">
+                                        <label class="form-label">Off-Peak (€/kWh)</label>
+                                        <input type="number" id="offPeakPrice" class="form-control" value="0.09" step="0.001" min="0">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Feed-in (€/kWh)</label>
+                                <input type="number" id="feedInPrice" class="form-control" value="0.07" step="0.001" min="0">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Monthly Fee (€)</label>
+                                <input type="number" id="monthlyFee" class="form-control" value="20" step="0.01" min="0">
+                            </div>
+                            <div class="col-md-1">
+                                <label class="form-label">&nbsp;</label>
+                                <button id="updateFinancials" class="btn btn-primary w-100">
+                                    <i class="fas fa-calculator"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-3">
+                                <label class="form-label">HEP Netting Ratio</label>
+                                <input type="number" id="nettingRatio" class="form-control" value="0.75" step="0.01" min="0" max="1" title="How much HEP credits for excess energy (0.75 = 75%)">
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Netting Ratio:</strong> HEP typically credits 70-80% of retail price for excess solar energy returned to grid
+                                </small>
+                            </div>
+                            <div class="col-md-3 text-end">
+                                <button id="resetDefaults" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-undo"></i> Reset to Defaults
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="chart-header">
+                                <h5>Cost vs Income</h5>
+                                <button class="info-button" onclick="toggleChartInfo('costInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="costInfo" class="chart-info">
+                                <strong>Cost vs Income:</strong> This pie chart shows how much you paid for electricity from the grid (red) versus how much money you earned by selling excess solar power back to the grid (green). The larger the green portion, the more money you earned from your solar panels.
+                            </div>
+                            <div id="costBreakdownChart" style="height: 300px;"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="chart-header">
+                                <h5>Solar Savings Breakdown</h5>
+                                <button class="info-button" onclick="toggleChartInfo('savingsInfo')" title="What does this chart show?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="savingsInfo" class="chart-info">
+                                <strong>Savings Breakdown:</strong> Shows different ways your solar panels save you money. "Self-Consumption Savings" is money saved by using your own solar power instead of buying from the grid. "Feed-in Income" is money earned by selling excess power. All amounts are in Euros (EUR).
+                            </div>
+                            <div id="savingsChart" style="height: 300px;"></div>
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="chart-header">
+                                <h5>Financial Summary</h5>
+                                <button class="info-button" onclick="toggleChartInfo('financialInfo')" title="What do these numbers mean?">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                            <div id="financialInfo" class="chart-info">
+                                <strong>Financial Summary:</strong> "Net Cost" is your actual electricity bill after solar savings. "Total Savings" shows how much money you saved compared to having no solar panels. "Savings %" shows what percentage of your electricity costs were eliminated by solar. Monthly/Yearly projections estimate future savings based on current patterns.
+                            </div>
+                            <div id="financialSummary"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comparison Tab -->
+                <div class="tab-pane fade" id="comparison-tab">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="controls-panel">
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <h6>Quick Comparison Presets</h6>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setComparisonPreset('this_vs_last_month')">This vs Last Month</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setComparisonPreset('this_vs_last_year')">This Year vs Last Year</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setComparisonPreset('this_vs_last_quarter')">This vs Last Quarter</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setComparisonPreset('summer_vs_winter')">Summer vs Winter</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <h6>Period 1</h6>
+                                        <div class="row">
+                                            <div class="col">
+                                                <input type="date" id="comp1Start" class="form-control">
+                                            </div>
+                                            <div class="col">
+                                                <input type="date" id="comp1End" class="form-control">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <h6>Period 2</h6>
+                                        <div class="row">
+                                            <div class="col">
+                                                <input type="date" id="comp2Start" class="form-control">
+                                            </div>
+                                            <div class="col">
+                                                <input type="date" id="comp2End" class="form-control">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <h6>&nbsp;</h6>
+                                        <button id="compareButton" class="btn btn-primary w-100">Compare</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div id="comparisonResults"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let currentData = {};
+        let charts = {};
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDatePickers();
+            updatePeriodDisplay();
+            loadFinancialSettings();
+            loadAllData();
+            setupEventListeners();
+            updateLastUpdateTime();
+        });
+
+        function initializeDatePickers() {
+            const today = new Date();
+            const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+            document.getElementById('startDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+
+            // Set comparison dates (last month vs this month)
+            const firstOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+
+            document.getElementById('comp1Start').value = firstOfLastMonth.toISOString().split('T')[0];
+            document.getElementById('comp1End').value = lastOfLastMonth.toISOString().split('T')[0];
+            document.getElementById('comp2Start').value = firstOfThisMonth.toISOString().split('T')[0];
+            document.getElementById('comp2End').value = today.toISOString().split('T')[0];
+        }
+
+        function setupEventListeners() {
+            document.getElementById('dateRange').addEventListener('change', function() {
+                const customRange = document.getElementById('customDateRange');
+                if (this.value === 'custom') {
+                    customRange.style.display = 'block';
+                } else {
+                    customRange.style.display = 'none';
+                    loadAllData();
+                }
+            });
+
+            document.getElementById('refreshData').addEventListener('click', loadAllData);
+            document.getElementById('compareButton').addEventListener('click', loadComparison);
+            document.getElementById('exportCSV').addEventListener('click', exportToCSV);
+            document.getElementById('exportPDF').addEventListener('click', exportToPDF);
+
+            // Custom date range inputs
+            document.getElementById('startDate').addEventListener('change', loadAllData);
+            document.getElementById('endDate').addEventListener('change', loadAllData);
+
+            // Handle efficiency tab chart resizing when tab becomes visible
+            document.querySelector('a[href="#efficiency-tab"]').addEventListener('shown.bs.tab', function () {
+                // Small delay to ensure DOM is fully ready
+                setTimeout(() => {
+                    Plotly.Plots.resize('independenceChart');
+                    Plotly.Plots.resize('selfConsumptionChart');
+                }, 50);
+            });
+
+            // Handle patterns tab chart resizing when tab becomes visible
+            document.querySelector('a[href="#patterns-tab"]').addEventListener('shown.bs.tab', function () {
+                // Small delay to ensure DOM is fully ready
+                setTimeout(() => {
+                    Plotly.Plots.resize('hourlyPatternChart');
+                    Plotly.Plots.resize('dailyPatternChart');
+                    Plotly.Plots.resize('monthlyPatternChart');
+                    Plotly.Plots.resize('timeOfUseChart');
+                }, 50);
+            });
+
+            // Financial configuration event listeners
+            document.getElementById('tariffType').addEventListener('change', toggleTariffInputs);
+            document.getElementById('updateFinancials').addEventListener('click', updateFinancialCalculations);
+            document.getElementById('resetDefaults').addEventListener('click', resetFinancialDefaults);
+        }
+
+        // Financial configuration functions
+        function loadFinancialSettings() {
+            // Load from localStorage if available
+            const settings = JSON.parse(localStorage.getItem('hep_financial_settings') || '{}');
+
+            if (settings.tariffType) document.getElementById('tariffType').value = settings.tariffType;
+            if (settings.singlePrice) document.getElementById('singlePrice').value = settings.singlePrice;
+            if (settings.peakPrice) document.getElementById('peakPrice').value = settings.peakPrice;
+            if (settings.offPeakPrice) document.getElementById('offPeakPrice').value = settings.offPeakPrice;
+            if (settings.feedInPrice) document.getElementById('feedInPrice').value = settings.feedInPrice;
+            if (settings.monthlyFee) document.getElementById('monthlyFee').value = settings.monthlyFee;
+            if (settings.nettingRatio) document.getElementById('nettingRatio').value = settings.nettingRatio;
+
+            toggleTariffInputs();
+        }
+
+        function saveFinancialSettings() {
+            const settings = {
+                tariffType: document.getElementById('tariffType').value,
+                singlePrice: document.getElementById('singlePrice').value,
+                peakPrice: document.getElementById('peakPrice').value,
+                offPeakPrice: document.getElementById('offPeakPrice').value,
+                feedInPrice: document.getElementById('feedInPrice').value,
+                monthlyFee: document.getElementById('monthlyFee').value,
+                nettingRatio: document.getElementById('nettingRatio').value
+            };
+            localStorage.setItem('hep_financial_settings', JSON.stringify(settings));
+        }
+
+        function toggleTariffInputs() {
+            const tariffType = document.getElementById('tariffType').value;
+            const singleGroup = document.getElementById('singleTariffGroup');
+            const dualGroup = document.getElementById('dualTariffGroup');
+
+            if (tariffType === 'single') {
+                singleGroup.style.display = 'block';
+                dualGroup.style.display = 'none';
+            } else {
+                singleGroup.style.display = 'none';
+                dualGroup.style.display = 'block';
+            }
+        }
+
+        function updateFinancialCalculations() {
+            saveFinancialSettings();
+            loadFinancial(); // Reload financial data with new settings
+        }
+
+        function resetFinancialDefaults() {
+            // Reset to Croatian 2024-2025 defaults
+            document.getElementById('tariffType').value = 'single';
+            document.getElementById('singlePrice').value = '0.11';
+            document.getElementById('peakPrice').value = '0.13';
+            document.getElementById('offPeakPrice').value = '0.09';
+            document.getElementById('feedInPrice').value = '0.07';
+            document.getElementById('monthlyFee').value = '20';
+            document.getElementById('nettingRatio').value = '0.75';
+
+            toggleTariffInputs();
+            updateFinancialCalculations();
+        }
+
+        function updatePeriodDisplay() {
+            const dateRange = document.getElementById('dateRange').value;
+            const periodDisplay = document.getElementById('periodDisplay');
+
+            const displayNames = {
+                '7': 'Last 7 days',
+                '30': 'Last 30 days',
+                '90': 'Last 3 months',
+                'this_week': 'This week',
+                'last_week': 'Last week',
+                'this_month': 'This month',
+                'last_month': 'Last month',
+                'this_quarter': 'This quarter',
+                'last_quarter': 'Last quarter',
+                'this_year_to_date': 'This year to date',
+                'this_year': 'This year (full)',
+                'last_year': 'Last year',
+                '365': 'Last 365 days',
+                'all_time': 'All time',
+                'custom': 'Custom range'
+            };
+
+            periodDisplay.textContent = displayNames[dateRange] || dateRange;
+        }
+
+        function getDateRange() {
+            const dateRange = document.getElementById('dateRange').value;
+            const today = new Date();
+
+            // Only update period display if we're not in the middle of loading data
+            if (document.getElementById('periodDisplay')) {
+                updatePeriodDisplay();
+            }
+
+            if (dateRange === 'custom') {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                // Update period display for custom range
+                document.getElementById('periodDisplay').textContent = `${startDate} to ${endDate}`;
+                return {
+                    start: startDate,
+                    end: endDate
+                };
+            }
+
+            let startDate, endDate;
+
+            switch (dateRange) {
+                case 'this_week':
+                    const dayOfWeek = today.getDay();
+                    const startOfWeek = new Date(today.getTime() - (dayOfWeek * 24 * 60 * 60 * 1000));
+                    startDate = startOfWeek;
+                    endDate = today;
+                    break;
+
+                case 'last_week':
+                    const lastWeekEnd = new Date(today.getTime() - (today.getDay() * 24 * 60 * 60 * 1000));
+                    const lastWeekStart = new Date(lastWeekEnd.getTime() - (6 * 24 * 60 * 60 * 1000));
+                    startDate = lastWeekStart;
+                    endDate = lastWeekEnd;
+                    break;
+
+                case 'this_month':
+                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    endDate = today;
+                    break;
+
+                case 'last_month':
+                    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+                    startDate = lastMonthStart;
+                    endDate = lastMonthEnd;
+                    break;
+
+                case 'this_quarter':
+                    const currentQuarter = Math.floor(today.getMonth() / 3);
+                    startDate = new Date(today.getFullYear(), currentQuarter * 3, 1);
+                    endDate = today;
+                    break;
+
+                case 'last_quarter':
+                    const lastQuarter = Math.floor(today.getMonth() / 3) - 1;
+                    const lastQuarterYear = lastQuarter < 0 ? today.getFullYear() - 1 : today.getFullYear();
+                    const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+                    startDate = new Date(lastQuarterYear, adjustedQuarter * 3, 1);
+                    endDate = new Date(lastQuarterYear, adjustedQuarter * 3 + 3, 0);
+                    break;
+
+                case 'this_year_to_date':
+                    startDate = new Date(today.getFullYear(), 0, 1);
+                    endDate = today;
+                    break;
+
+                case 'this_year':
+                    startDate = new Date(today.getFullYear(), 0, 1);
+                    endDate = new Date(today.getFullYear(), 11, 31);
+                    break;
+
+                case 'last_year':
+                    startDate = new Date(today.getFullYear() - 1, 0, 1);
+                    endDate = new Date(today.getFullYear() - 1, 11, 31);
+                    break;
+
+                case 'all_time':
+                    // Use a very early date to get all data
+                    startDate = new Date('2020-01-01');
+                    endDate = today;
+                    break;
+
+                default:
+                    // Handle numeric values (days)
+                    const days = parseInt(dateRange);
+                    startDate = new Date(today.getTime() - (days * 24 * 60 * 60 * 1000));
+                    endDate = today;
+                    break;
+            }
+
+            return {
+                start: startDate.toISOString().split('T')[0],
+                end: endDate.toISOString().split('T')[0]
+            };
+        }
+
+        async function loadAllData() {
+            showLoading();
+            try {
+                // Use Promise.allSettled to continue even if some APIs fail
+                const results = await Promise.allSettled([
+                    loadOverview(),
+                    loadDailyData(),
+                    loadMonthlyData(),
+                    loadPatterns(),
+                    loadEfficiency(),
+                    loadFinancial()
+                ]);
+
+                // Log any failed promises
+                results.forEach((result, index) => {
+                    if (result.status === 'rejected') {
+                        const functions = ['loadOverview', 'loadDailyData', 'loadMonthlyData', 'loadPatterns', 'loadEfficiency', 'loadFinancial'];
+                        console.error(`${functions[index]} failed:`, result.reason);
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading data:', error);
+            } finally {
+                // Always hide loading, even if errors occurred
+                hideLoading();
+                updateLastUpdateTime();
+            }
+        }
+
+        async function loadOverview() {
+            const dateRange = getDateRange();
+            const params = new URLSearchParams({
+                start_date: dateRange.start,
+                end_date: dateRange.end
+            });
+            const response = await fetch(`/api/overview?${params}`);
+            const data = await response.json();
+            currentData.overview = data;
+            updateMetricsCards(data);
+        }
+
+        async function loadDailyData() {
+            const dateRange = getDateRange();
+            const response = await fetch(`/api/daily?start_date=${dateRange.start}&end_date=${dateRange.end}`);
+            const data = await response.json();
+            currentData.daily = data;
+            createOverviewChart(data);
+        }
+
+        async function loadMonthlyData() {
+            const response = await fetch('/api/monthly');
+            const data = await response.json();
+            currentData.monthly = data;
+            createMonthlyChart(data);
+            createNetEnergyChart(data);
+        }
+
+        async function loadPatterns() {
+            const dateRange = getDateRange();
+            try {
+                const [hourly, daily, monthly, timeOfUse] = await Promise.all([
+                    fetch('/api/patterns?type=hourly').then(r => r.json()),
+                    fetch('/api/patterns?type=daily').then(r => r.json()),
+                    fetch('/api/patterns?type=monthly').then(r => r.json()),
+                    fetch(`/api/time-of-use?start_date=${dateRange.start}&end_date=${dateRange.end}`).then(r => r.json())
+                ]);
+
+                console.log('Pattern data loaded:', { hourly: hourly.length, daily: daily.length, monthly: monthly.length, timeOfUse: timeOfUse.length });
+                currentData.patterns = { hourly, daily, monthly, timeOfUse };
+                createPatternCharts(hourly, daily, monthly, timeOfUse);
+            } catch (error) {
+                console.error('Error loading patterns:', error);
+                // Show error message instead of loading spinner
+                document.getElementById('timeOfUseChart').innerHTML = '<div style="text-align: center; padding: 50px;">Error loading chart data</div>';
+            }
+        }
+
+        async function loadEfficiency() {
+            const dateRange = getDateRange();
+            try {
+                const response = await fetch(`/api/efficiency?start_date=${dateRange.start}&end_date=${dateRange.end}`);
+                const data = await response.json();
+                console.log('Efficiency data loaded:', data.daily_metrics?.length || 0, 'daily metrics');
+                currentData.efficiency = data;
+                createEfficiencyCharts(data);
+            } catch (error) {
+                console.error('Error loading efficiency data:', error);
+                document.getElementById('independenceChart').innerHTML = '<div style="text-align: center; padding: 50px;">Error loading chart data</div>';
+                document.getElementById('selfConsumptionChart').innerHTML = '<div style="text-align: center; padding: 50px;">Error loading chart data</div>';
+            }
+        }
+
+        async function loadFinancial() {
+            const dateRange = getDateRange();
+
+            // Get current financial configuration
+            const tariffType = document.getElementById('tariffType').value;
+            const singlePrice = document.getElementById('singlePrice').value;
+            const peakPrice = document.getElementById('peakPrice').value;
+            const offPeakPrice = document.getElementById('offPeakPrice').value;
+            const feedInPrice = document.getElementById('feedInPrice').value;
+            const monthlyFee = document.getElementById('monthlyFee').value;
+            const nettingRatio = document.getElementById('nettingRatio').value;
+
+            // Build query parameters
+            const params = new URLSearchParams({
+                start_date: dateRange.start,
+                end_date: dateRange.end,
+                tariff_type: tariffType,
+                single_price: singlePrice,
+                peak_price: peakPrice,
+                offpeak_price: offPeakPrice,
+                feed_in_price: feedInPrice,
+                monthly_fee: monthlyFee,
+                netting_ratio: nettingRatio
+            });
+
+            try {
+                const response = await fetch(`/api/financial?${params}`);
+                const data = await response.json();
+                console.log('Financial data loaded with configuration:', { tariffType, singlePrice, peakPrice, offPeakPrice });
+                currentData.financial = data;
+                createFinancialCharts(data);
+            } catch (error) {
+                console.error('Error loading financial data:', error);
+                document.getElementById('costBreakdownChart').innerHTML = '<div style="text-align: center; padding: 50px;">Error loading chart data</div>';
+                document.getElementById('savingsChart').innerHTML = '<div style="text-align: center; padding: 50px;">Error loading chart data</div>';
+            }
+        }
+
+        async function loadComparison() {
+            const period1Start = document.getElementById('comp1Start').value;
+            const period1End = document.getElementById('comp1End').value;
+            const period2Start = document.getElementById('comp2Start').value;
+            const period2End = document.getElementById('comp2End').value;
+
+            const response = await fetch(`/api/comparison?period1_start=${period1Start}&period1_end=${period1End}&period2_start=${period2Start}&period2_end=${period2End}`);
+            const data = await response.json();
+            displayComparison(data);
+        }
+
+        function updateMetricsCards(data) {
+            const metricsRow = document.getElementById('metricsRow');
+            const totals = data.totals;
+            const trends = data.recent_trends;
+            const comparison = data.period_comparison || {};
+
+            // Helper function to format comparison display
+            function formatComparison(changeValue, comparisonLabel) {
+                if (!changeValue || !comparisonLabel) return '';
+
+                const isPositive = changeValue > 0;
+                const absValue = Math.abs(changeValue);
+
+                return `<div class="metric-change ${isPositive ? 'positive' : 'negative'}">
+                    <i class="fas fa-arrow-${isPositive ? 'up' : 'down'}"></i>
+                    ${absValue.toFixed(1)}% ${comparisonLabel}
+                </div>`;
+            }
+
+            metricsRow.innerHTML = `
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-label">Total Consumed</div>
+                        <div class="metric-value">${totals.consumed.toFixed(1)} <small>kWh</small></div>
+                        ${formatComparison(comparison.consumed_change, comparison.comparison_label)}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-label">Total Produced</div>
+                        <div class="metric-value">${totals.produced.toFixed(1)} <small>kWh</small></div>
+                        ${formatComparison(comparison.produced_change, comparison.comparison_label)}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-label">Net Energy</div>
+                        <div class="metric-value">${totals.net.toFixed(1)} <small>kWh</small></div>
+                        <div class="metric-change ${totals.net < 0 ? 'positive' : 'negative'}">
+                            <span class="status-indicator ${totals.net < 0 ? 'status-good' : 'status-warning'}"></span>
+                            ${totals.net < 0 ? 'Net Producer' : 'Net Consumer'}
+                        </div>
+                        ${comparison.net_change !== undefined ? `<div class="metric-change ${comparison.net_change < 0 ? 'positive' : 'negative'}" style="font-size: 0.7rem;">
+                            <i class="fas fa-arrow-${comparison.net_change > 0 ? 'up' : 'down'}"></i>
+                            ${Math.abs(comparison.net_change).toFixed(1)}% ${comparison.comparison_label}
+                        </div>` : ''}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-label">Self-Consumption</div>
+                        <div class="metric-value">${totals.self_consumption_ratio.toFixed(1)} <small>%</small></div>
+                        <div class="metric-change">
+                            <span class="status-indicator ${totals.self_consumption_ratio > 70 ? 'status-good' : totals.self_consumption_ratio > 50 ? 'status-warning' : 'status-error'}"></span>
+                            ${totals.self_consumption_ratio > 70 ? 'Excellent' : totals.self_consumption_ratio > 50 ? 'Good' : 'Needs Improvement'}
+                        </div>
+                        ${formatComparison(comparison.self_consumption_change, comparison.comparison_label)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function createOverviewChart(data) {
+            const trace1 = {
+                x: data.map(d => d.datum),
+                y: data.map(d => d.consumed_kwh),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Consumed',
+                line: { color: '#e74c3c', width: 2 },
+                marker: { size: 4 }
+            };
+
+            const trace2 = {
+                x: data.map(d => d.datum),
+                y: data.map(d => d.produced_kwh),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Produced',
+                line: { color: '#27ae60', width: 2 },
+                marker: { size: 4 }
+            };
+
+            const trace3 = {
+                x: data.map(d => d.datum),
+                y: data.map(d => d.net_kwh),
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Net',
+                line: { color: '#3498db', width: 1, dash: 'dash' },
+                yaxis: 'y2'
+            };
+
+            const layout = {
+                title: 'Daily Energy Consumption and Production',
+                xaxis: { title: 'Date' },
+                yaxis: { title: 'Energy (kWh)', side: 'left' },
+                yaxis2: { title: 'Net Energy (kWh)', side: 'right', overlaying: 'y' },
+                legend: { x: 0, y: 1 },
+                hovermode: 'x unified',
+                margin: { t: 40, r: 60, b: 40, l: 60 }
+            };
+
+            Plotly.newPlot('overviewChart', [trace1, trace2, trace3], layout, { responsive: true });
+        }
+
+        function createMonthlyChart(data) {
+            const trace1 = {
+                x: data.map(d => d.month_name + ' ' + d.year),
+                y: data.map(d => d.consumed_kwh),
+                type: 'bar',
+                name: 'Consumed',
+                marker: { color: '#e74c3c' }
+            };
+
+            const trace2 = {
+                x: data.map(d => d.month_name + ' ' + d.year),
+                y: data.map(d => d.produced_kwh),
+                type: 'bar',
+                name: 'Produced',
+                marker: { color: '#27ae60' }
+            };
+
+            const layout = {
+                title: 'Monthly Energy Totals',
+                xaxis: { title: 'Month' },
+                yaxis: { title: 'Energy (kWh)' },
+                barmode: 'group',
+                margin: { t: 40, r: 20, b: 60, l: 60 }
+            };
+
+            Plotly.newPlot('monthlyChart', [trace1, trace2], layout, { responsive: true });
+        }
+
+        function createNetEnergyChart(data) {
+            const trace = {
+                x: data.map(d => d.month_name + ' ' + d.year),
+                y: data.map(d => d.net_kwh),
+                type: 'bar',
+                name: 'Net Energy',
+                marker: {
+                    color: data.map(d => d.net_kwh >= 0 ? '#e74c3c' : '#27ae60')
+                }
+            };
+
+            const layout = {
+                title: 'Monthly Net Energy Balance',
+                xaxis: { title: 'Month' },
+                yaxis: { title: 'Net Energy (kWh)' },
+                margin: { t: 40, r: 20, b: 60, l: 60 }
+            };
+
+            Plotly.newPlot('netEnergyChart', [trace], layout, { responsive: true });
+        }
+
+        function createPatternCharts(hourly, daily, monthly, timeOfUse) {
+            // Hourly pattern
+            const hourlyTrace = {
+                x: hourly.map(d => d.time_label),
+                y: hourly.map(d => d.avg_consumed_kwh),
+                type: 'bar',
+                name: 'Consumed',
+                marker: { color: '#3498db' }
+            };
+
+            Plotly.newPlot('hourlyPatternChart', [hourlyTrace], {
+                title: 'Average Hourly Consumption',
+                xaxis: { title: 'Hour' },
+                yaxis: { title: 'Avg kWh' },
+                margin: { t: 40, r: 20, b: 40, l: 40 }
+            }, { responsive: true });
+
+            // Daily pattern
+            const dailyTrace = {
+                x: daily.map(d => d.time_label),
+                y: daily.map(d => d.avg_consumed_kwh),
+                type: 'bar',
+                name: 'Consumed',
+                marker: { color: '#9b59b6' }
+            };
+
+            Plotly.newPlot('dailyPatternChart', [dailyTrace], {
+                title: 'Average Daily Consumption',
+                xaxis: { title: 'Day of Week' },
+                yaxis: { title: 'Avg kWh' },
+                margin: { t: 40, r: 20, b: 40, l: 40 }
+            }, { responsive: true });
+
+            // Monthly pattern
+            const monthlyTrace = {
+                x: monthly.map(d => d.time_label),
+                y: monthly.map(d => d.avg_consumed_kwh),
+                type: 'bar',
+                name: 'Consumed',
+                marker: { color: '#e67e22' }
+            };
+
+            Plotly.newPlot('monthlyPatternChart', [monthlyTrace], {
+                title: 'Average Monthly Consumption',
+                xaxis: { title: 'Month' },
+                yaxis: { title: 'Avg kWh' },
+                margin: { t: 40, r: 20, b: 40, l: 40 }
+            }, { responsive: true });
+
+            // Time of use
+            const timeOfUseTrace = {
+                labels: timeOfUse.map(d => d.time_period + ' (' + d.tariff_period + ')'),
+                values: timeOfUse.map(d => d.total_consumed),
+                type: 'pie',
+                hole: 0.4
+            };
+
+            Plotly.newPlot('timeOfUseChart', [timeOfUseTrace], {
+                title: 'Consumption by Time Period',
+                margin: { t: 40, r: 40, b: 40, l: 40 },
+                autosize: true,
+                showlegend: true,
+                legend: {
+                    orientation: "v",
+                    x: 1.02,
+                    y: 0.5
+                }
+            }, { responsive: true }).then(() => {
+                // Force layout recalculation after plot is created
+                setTimeout(() => {
+                    window.dispatchEvent(new Event('resize'));
+                }, 100);
+            });
+        }
+
+        function createEfficiencyCharts(data) {
+            // Independence trend
+            const independenceTrace = {
+                x: data.daily_metrics.map(d => d.datum),
+                y: data.daily_metrics.map(d => d.energy_independence_pct),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Energy Independence %',
+                line: { color: '#27ae60' }
+            };
+
+            Plotly.newPlot('independenceChart', [independenceTrace], {
+                title: 'Daily Energy Independence',
+                xaxis: { title: 'Date' },
+                yaxis: { title: 'Independence %', range: [0, 100] },
+                margin: { t: 40, r: 20, b: 40, l: 60 }
+            }, { responsive: true });
+
+            // Self-consumption vs export
+            const exportTrace = {
+                x: data.daily_metrics.map(d => d.datum),
+                y: data.daily_metrics.map(d => d.grid_export_pct),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Grid Export %',
+                line: { color: '#e74c3c' }
+            };
+
+            Plotly.newPlot('selfConsumptionChart', [exportTrace], {
+                title: 'Daily Grid Export Percentage',
+                xaxis: { title: 'Date' },
+                yaxis: { title: 'Export %' },
+                margin: { t: 40, r: 20, b: 40, l: 60 }
+            }, { responsive: true });
+
+            // Efficiency metrics summary
+            const summary = data.summary;
+            document.getElementById('efficiencyMetrics').innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-label">Avg Energy Independence</div>
+                            <div class="metric-value">${summary.avg_energy_independence.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-label">Avg Grid Export</div>
+                            <div class="metric-value">${summary.avg_grid_export.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-label">Self-Sufficient Days</div>
+                            <div class="metric-value">${summary.self_sufficient_days}</div>
+                            <div class="metric-change">out of ${summary.total_days} days</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-label">Self-Sufficiency Ratio</div>
+                            <div class="metric-value">${summary.self_sufficiency_ratio.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createFinancialCharts(data) {
+            // Cost breakdown pie chart
+            const costTrace = {
+                labels: ['Grid Consumption Cost', 'Feed-in Income (Savings)'],
+                values: [data.costs.grid_consumption_cost, data.costs.feed_in_income],
+                type: 'pie',
+                marker: {
+                    colors: ['#e74c3c', '#27ae60']
+                }
+            };
+
+            Plotly.newPlot('costBreakdownChart', [costTrace], {
+                title: 'Cost vs Income (EUR)',
+                margin: { t: 40, r: 20, b: 40, l: 20 }
+            }, { responsive: true });
+
+            // Savings bar chart
+            const savingsTrace = {
+                x: ['Self-Consumption Savings', 'Feed-in Income', 'Total Benefit'],
+                y: [data.savings.self_consumption_savings, data.costs.feed_in_income, data.savings.total_benefit],
+                type: 'bar',
+                marker: { color: '#27ae60' }
+            };
+
+            Plotly.newPlot('savingsChart', [savingsTrace], {
+                title: 'Savings Breakdown (EUR)',
+                xaxis: { title: 'Savings Type' },
+                yaxis: { title: 'Amount (EUR)' },
+                margin: { t: 40, r: 20, b: 60, l: 60 }
+            }, { responsive: true });
+
+            // Financial summary
+            document.getElementById('financialSummary').innerHTML = `
+                <div class="row">
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-label">Net Cost</div>
+                            <div class="metric-value">${data.costs.net_cost.toFixed(2)} <small>EUR</small></div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-label">Total Savings</div>
+                            <div class="metric-value">${data.savings.total_savings_vs_no_solar.toFixed(2)} <small>EUR</small></div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-label">Savings %</div>
+                            <div class="metric-value">${data.savings.savings_percentage}%</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-label">Monthly Projection</div>
+                            <div class="metric-value">${data.projections.monthly_savings.toFixed(2)} <small>EUR</small></div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-label">Yearly Projection</div>
+                            <div class="metric-value">${data.projections.yearly_savings.toFixed(2)} <small>EUR</small></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayComparison(data) {
+            const results = document.getElementById('comparisonResults');
+            results.innerHTML = `
+                <div class="chart-container">
+                    <h5>Period Comparison Results</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Period 1 (${data.period1.start} to ${data.period1.end})</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="metric-card">
+                                        <div class="metric-label">Consumed</div>
+                                        <div class="metric-value">${data.period1.consumed.toFixed(1)} <small>kWh</small></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="metric-card">
+                                        <div class="metric-label">Produced</div>
+                                        <div class="metric-value">${data.period1.produced.toFixed(1)} <small>kWh</small></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="metric-card">
+                                        <div class="metric-label">Net</div>
+                                        <div class="metric-value">${data.period1.net.toFixed(1)} <small>kWh</small></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Period 2 (${data.period2.start} to ${data.period2.end})</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="metric-card">
+                                        <div class="metric-label">Consumed</div>
+                                        <div class="metric-value">${data.period2.consumed.toFixed(1)} <small>kWh</small></div>
+                                        <div class="metric-change ${data.changes.consumed > 0 ? 'positive' : 'negative'}">
+                                            ${data.changes.consumed > 0 ? '+' : ''}${data.changes.consumed.toFixed(1)}%
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="metric-card">
+                                        <div class="metric-label">Produced</div>
+                                        <div class="metric-value">${data.period2.produced.toFixed(1)} <small>kWh</small></div>
+                                        <div class="metric-change ${data.changes.produced > 0 ? 'positive' : 'negative'}">
+                                            ${data.changes.produced > 0 ? '+' : ''}${data.changes.produced.toFixed(1)}%
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="metric-card">
+                                        <div class="metric-label">Net</div>
+                                        <div class="metric-value">${data.period2.net.toFixed(1)} <small>kWh</small></div>
+                                        <div class="metric-change ${data.changes.net < 0 ? 'positive' : 'negative'}">
+                                            ${data.changes.net > 0 ? '+' : ''}${data.changes.net.toFixed(1)}%
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showLoading() {
+            // Add loading indicators to charts
+            const chartContainers = document.querySelectorAll('[id$="Chart"]');
+            chartContainers.forEach(container => {
+                container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+            });
+        }
+
+        function hideLoading() {
+            // Loading will be replaced by actual charts
+        }
+
+        function updateLastUpdateTime() {
+            document.getElementById('lastUpdate').textContent = 'Last updated: ' + new Date().toLocaleString();
+        }
+
+        function exportToCSV() {
+            if (!currentData.daily) return;
+
+            const csv = [
+                ['Date', 'Consumed (kWh)', 'Produced (kWh)', 'Net (kWh)', 'Self-Consumption Ratio'],
+                ...currentData.daily.map(row => [
+                    row.datum,
+                    row.consumed_kwh,
+                    row.produced_kwh,
+                    row.net_kwh,
+                    row.self_consumption_ratio
+                ])
+            ].map(row => row.join(',')).join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'hep_energy_data.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function exportToPDF() {
+            window.print();
+        }
+
+        function setComparisonPreset(preset) {
+            const today = new Date();
+            let period1Start, period1End, period2Start, period2End;
+
+            switch (preset) {
+                case 'this_vs_last_month':
+                    // Last month vs This month
+                    period1Start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    period1End = new Date(today.getFullYear(), today.getMonth(), 0);
+                    period2Start = new Date(today.getFullYear(), today.getMonth(), 1);
+                    period2End = today;
+                    break;
+
+                case 'this_vs_last_year':
+                    // Same month last year vs This month
+                    period1Start = new Date(today.getFullYear() - 1, today.getMonth(), 1);
+                    period1End = new Date(today.getFullYear() - 1, today.getMonth() + 1, 0);
+                    period2Start = new Date(today.getFullYear(), today.getMonth(), 1);
+                    period2End = today;
+                    break;
+
+                case 'this_vs_last_quarter':
+                    // Last quarter vs This quarter
+                    const currentQuarter = Math.floor(today.getMonth() / 3);
+                    const lastQuarter = currentQuarter - 1;
+                    const lastQuarterYear = lastQuarter < 0 ? today.getFullYear() - 1 : today.getFullYear();
+                    const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+
+                    period1Start = new Date(lastQuarterYear, adjustedQuarter * 3, 1);
+                    period1End = new Date(lastQuarterYear, adjustedQuarter * 3 + 3, 0);
+                    period2Start = new Date(today.getFullYear(), currentQuarter * 3, 1);
+                    period2End = today;
+                    break;
+
+                case 'summer_vs_winter':
+                    // Last winter vs Last summer
+                    const currentYear = today.getFullYear();
+                    if (today.getMonth() >= 6) { // July-December
+                        // Compare current summer vs last winter
+                        period1Start = new Date(currentYear - 1, 11, 1); // December
+                        period1End = new Date(currentYear, 2, 0); // End of February
+                        period2Start = new Date(currentYear, 5, 1); // June
+                        period2End = new Date(currentYear, 8, 0); // End of August
+                    } else { // January-June
+                        // Compare last summer vs current winter
+                        period1Start = new Date(currentYear - 1, 5, 1); // June last year
+                        period1End = new Date(currentYear - 1, 8, 0); // End of August last year
+                        period2Start = new Date(currentYear - 1, 11, 1); // December last year
+                        period2End = new Date(currentYear, 2, 0); // End of February this year
+                    }
+                    break;
+
+                default:
+                    return;
+            }
+
+            document.getElementById('comp1Start').value = period1Start.toISOString().split('T')[0];
+            document.getElementById('comp1End').value = period1End.toISOString().split('T')[0];
+            document.getElementById('comp2Start').value = period2Start.toISOString().split('T')[0];
+            document.getElementById('comp2End').value = period2End.toISOString().split('T')[0];
+        }
+
+        function toggleChartInfo(infoId) {
+            const infoElement = document.getElementById(infoId);
+            if (infoElement.classList.contains('show')) {
+                infoElement.classList.remove('show');
+            } else {
+                // Hide all other info boxes first
+                document.querySelectorAll('.chart-info.show').forEach(el => el.classList.remove('show'));
+                // Show the clicked one
+                infoElement.classList.add('show');
+            }
+        }
+    </script>
+</body>
+</html>
